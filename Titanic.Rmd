@@ -1,0 +1,345 @@
+---
+title: "Titanic Survival prediction"
+output: html_document
+---
+
+
+```{r}
+library(dplyr)
+library(GGally)
+titanic_data=read.csv(file="C:\\Users\\Dwarkesh\\Documents\\UC\\Summer\\BANA7046- Data Mining 1\\Week 7\\Titanic\\Main_Data.csv",header = T)
+titanic_data=titanic_data[,-1]
+
+head(titanic_data)
+
+#remove passenger number
+
+#colnames(titanic_data)=c("Status")
+titanic_data=rename(titanic_data,Age=Age,TicketFare=Fare,FamilySize=Family_size,Survived=Survived,Sex=Sex,FirstClass=Pclass_1,SecondClass=Pclass_2,ThirdClass=Pclass_3,Mr=Title_1 ,Mrs=Title_2,Master=Title_3,Miss=Title_4,Cherbourg=Emb_1,Queenstown=Emb_2,Southampton=Emb_3)
+
+
+
+#colnames(titanic_data)
+mean(titanic_data$Survived)
+#titanic_data$<- as.factor(titanic_data$)
+
+
+titanic_data$Survived<- as.factor(titanic_data$Survived)
+titanic_data$Sex<- as.factor(titanic_data$Sex)
+titanic_data$FirstClass<- as.factor(titanic_data$FirstClass)
+titanic_data$SecondClass<- as.factor(titanic_data$SecondClass)
+titanic_data$ThirdClass<- as.factor(titanic_data$ThirdClass)
+titanic_data$Mr<- as.factor(titanic_data$Mr)
+titanic_data$Mrs<- as.factor(titanic_data$Mrs)
+titanic_data$Master<- as.factor(titanic_data$Master)
+titanic_data$Miss<- as.factor(titanic_data$Miss)
+titanic_data$Cherbourg<- as.factor(titanic_data$Cherbourg)
+titanic_data$Queenstown<- as.factor(titanic_data$Queenstown)
+titanic_data$Southampton<- as.factor(titanic_data$Southampton)
+
+summary(titanic_data)
+
+set.seed(13944529)
+val=sample(nrow(titanic_data),nrow(titanic_data)*0.9)
+#write.csv(summary(titanic_data,2), file = "Summary.csv")
+
+
+head(titanic_data,2)
+colnames(titanic_data)
+apply(titanic_data,2,sd)
+#write.csv(apply(titanic_data,2,sd), file = "SD.csv")
+
+box_var=c("Age","TicketFare","FamilySize")
+
+#box_var=c("Survived","Sex",''FirstClass'',''SecondClass'',''ThirdClass'',''Mr'',''Mrs'',''Master'',''Miss'',''Cherbourg'',''Queenstown'',''Southampton'')
+boxplot(titanic_data[,box_var])
+ggpairs(titanic_data[,box_var])
+```
+
+
+
+```{r}
+titanic_data=na.omit(titanic_data)
+titanic_train=titanic_data[val,]
+titanic_test=titanic_data[-val,]
+titanic_train=na.omit(titanic_train)
+titanic_test=na.omit(titanic_test)
+titanic_glm=glm(formula=Survived~.,data=titanic_train,family="binomial")
+summary(titanic_glm)$coefficients
+probit_titanic_glm=glm(formula=Survived~.,data=titanic_train,family=binomial(link="probit"))
+cloglog_titanic_glm=glm(formula=Survived~.,data=titanic_train,family=binomial(link="cloglog"))
+
+summary(probit_titanic_glm)
+summary(cloglog_titanic_glm)
+```
+
+
+```{r}
+AIC(titanic_glm)
+AIC(probit_titanic_glm)
+AIC(cloglog_titanic_glm)
+
+BIC(titanic_glm)
+BIC(probit_titanic_glm)
+BIC(cloglog_titanic_glm)
+```
+
+
+```{r}
+(titanic_glm$deviance)
+(probit_titanic_glm$deviance)
+(cloglog_titanic_glm$deviance)
+
+```
+The cloglog interpretation generates the best model on the basis of AIC and deviance
+
+```{r}
+
+best_aic=step(cloglog_titanic_glm,k=2)
+summary(best_aic)
+```
+The best selection of AIC-based model is:
+
+Survived ~ Sex + Age + TicketFare + FirstClass + 
+    SecondClass + FamilySize + Mr + Master + Southampton
+
+```{r}
+best_bic=step(cloglog_titanic_glm,k=log(nrow(titanic_train)))
+BIC(best_bic)
+
+```
+The best model using BIC-based selection is 
+
+Survived ~ Sex + FirstClass + SecondClass + FamilySize + Master
+
+```{r}
+library(glmnet)
+lasso_titanic= glmnet(x = as.matrix(titanic_train[, -c(which(colnames(titanic_train)=='Survived'))]), y = titanic_train$Survived, alpha = 1,family="binomial",lambda=0.01)
+
+coef(lasso_titanic,s=0.01)
+```
+
+The formula for lasso regression at lambda=0.01 can be written as
+
+Survived~Sex +Age+TicketFare+FirstClass+ThirdClass+FamilySize+Master+Miss+Cherbourg+Southampton
+
+
+```{r}
+best_aic$deviance
+best_bic$deviance
+deviance(lasso_titanic)
+```
+```{r}
+#install.packages("sAIC")
+#library(sAIC)
+best_aic$aic
+best_bic$aic
+#sAIC(titanic_train, lasso_titanic)
+```
+
+
+```{r}
+BIC(best_aic)
+BIC(best_bic)
+```
+
+Among the common factors that can be measured across all three models, we observe the AIC model has least deviance.
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+#model selection
+best_aic
+```
+By AIC-based model selection, we obtain the best model as
+Survived ~ Sex + Age + TicketFare+ FirstClass + SecondClass + 
+    FamilySize + Mr + Master + Southampton
+
+
+```{r}
+
+
+
+```
+
+```{r}
+summary(best_aic)$coefficients
+
+```
+```{r}
+hist(predict(best_aic))
+
+
+```
+
+
+```{r}
+
+pred_resp_aic=predict((best_aic),type="response")
+#(pred_resp_bic)
+```
+The plot represents probability of Survived which we appears to be low for the training data.
+
+```{r}
+conf_matrix_aic=table(titanic_train$Survived,(pred_resp_aic>1/6)*1,dnn = c("Actual","Predicted"))
+
+mis_rate_aic=100*(conf_matrix_aic[1,2]+5*conf_matrix_aic[2,1])/sum(conf_matrix_aic)
+mis_rate_aic
+```
+
+
+```{r}
+#In Sample ROC
+
+#install.packages('ROCR')
+```
+```{r}
+library(ROCR)
+best_aic_train=predict(best_aic,type="response")
+
+pred_aic=prediction(best_aic_train,titanic_train$Survived)
+perf_aic<-performance(pred_aic,"tpr","fpr")
+plot(perf_aic,colorize=TRUE)
+
+#class(pred_bic)
+```
+
+
+```{r}
+unlist(slot(performance(pred_aic,"auc"),"y.values"))
+
+
+```
+Out of sample results::
+
+```{r}
+test_pred_best_aic=predict((best_aic),newdata=titanic_test,type="response")
+
+
+```
+
+
+```{r}
+
+test_conf_matrix_aic=table(titanic_test$Survived,(test_pred_best_aic>1/6)*1,dnn = c("Actual","Predicted"))
+
+test_mis_rate_aic=100*(test_conf_matrix_aic[1,2]+5*test_conf_matrix_aic[2,1])/sum(test_conf_matrix_aic)
+test_mis_rate_aic
+
+```
+
+```{r}
+test_titanic_glm_aic=predict(best_aic,newdata=titanic_test,type="response")
+
+test_pred_aic=prediction(test_titanic_glm_aic,titanic_test$Survived)
+test_perf_aic<-performance(test_pred_aic,"tpr","fpr")
+plot(test_perf_aic,colorize=TRUE)
+
+```
+
+
+```{r}
+unlist(slot(performance(test_pred_aic,"auc"),"y.values"))
+
+custom_cost=function(obs,pred){
+  w1=5
+  w0=1
+  pcut=w0/(w0+w1)
+  c1=(obs==1)&(pred<pcut)
+  c0=(obs==0)&(pred>=pcut)
+  val=c1*w1+c0*w0
+  #print(mean(val))
+  return(mean(val))
+  
+  
+}
+```
+
+
+```{r}
+library(boot)
+
+#Survived ~Sex + Age + TicketFare+ FirstClass+SecondClass+FamilySize + Mr + Master + Southampton
+full_best_aic=glm(data=titanic_data,formula=Survived ~Sex + Age + TicketFare+ FirstClass+SecondClass+FamilySize + Mr + Master + Southampton,family = binomial(link="cloglog"))
+cv_aic=cv.glm(data=titanic_data,glmfit=full_best_aic,cost=custom_cost,K=5)
+cv_aic$delta[2]
+```
+
+```{r}
+test_pred_cv=predict((full_best_aic),newdata=titanic_data,type="response")
+
+
+```
+
+
+```{r}
+
+conf_matrix_cv=table(titanic_data$Survived,(test_pred_cv>1/6)*1,dnn = c("Actual","Predicted"))
+
+mis_rate_cv=100*(conf_matrix_cv[1,2]+5*conf_matrix_cv[2,1])/sum(conf_matrix_cv)
+mis_rate_cv
+
+```
+
+```{r}
+titanic_glm_cv=predict(full_best_aic,newdata=titanic_data,type="response")
+
+pred_cv=prediction(titanic_glm_cv,titanic_data$Survived)
+perf_cv<-performance(pred_cv,"tpr","fpr")
+plot(perf_cv,colorize=TRUE)
+
+unlist(slot(performance(pred_cv,"auc"),"y.values"))
+
+
+```
+
+```{r}
+library(ROCR)
+library(rpart)
+library(rpart.plot)
+
+titanic_rpart=rpart(formula=Survived~.,data=titanic_data,method="class")
+titanic_rpart
+
+
+```
+
+
+```{r}
+prp(titanic_rpart,extra=1)
+
+```
+```{r}
+plotcp(titanic_rpart)
+```
+
+
+```{r}
+
+printcp(titanic_rpart)
+```
+
+
+```{r}
+##OOS CART
+titanic_rpart=rpart(formula=Survived~.,titanic_train,method="class")
+pred_cart=predict(titanic_rpart,type="class")
+table(titanic_train$Survived,pred_cart,dnn=c("Actual","Predicted"))
+
+titanic_cart=predict(titanic_rpart,newdata=titanic_test,type="class")
+#length(titanic_cart)
+#nrow(titanic_test)
+pred_cv=prediction(c(titanic_cart),titanic_test$Survived)
+perf_cv<-performance(pred_cv,"tpr","fpr")
+plot(perf_cv,colorize=TRUE)
+unlist(slot(performance(pred_cv,"auc"),"y.values"))
+
+
+```
+
